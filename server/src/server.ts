@@ -166,7 +166,7 @@ app.post('/burger', async function (req, res) {
         const { name, meat, bread, opcionais, status } = req.body;
 
         if (!name || !meat || !bread || !opcionais || !status) {
-            return res.status(400).send({ message: 'Não há nada caralho!' })
+            return res.status(400).send({ message: 'Falta parâmetros' })
         }
         const db = new sqlite()
 
