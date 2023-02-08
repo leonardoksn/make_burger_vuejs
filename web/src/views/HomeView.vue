@@ -1,7 +1,14 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import BurgerForm from "@/components/BurgerForm.vue";
+import Banner from "../components/BannerComp.vue";
+</script>
 
 <template>
-  <main class="home">
-    <h1>Home</h1>
-  </main>
+  <div>
+    <Banner />
+    <main>
+      <h1>Monte o seu burger:</h1>
+      <BurgerForm />
+    </main>
+  </div>
 </template>
