@@ -1,12 +1,25 @@
 
 import express from 'express'
+import cors from 'cors'
 import dotenv from 'dotenv'
+import 'express-async-errors';
+
 import sqlite from './database/db-config.js'
 import { IConsultsOrder, IIngredients, IOrder } from './interfaces/index.js';
 import { SearchProperty } from './utils/search-property-index.js';
 dotenv.config();
 
 const app = express();
+app.use(express.json())
+
+app.use(
+    cors({
+        credentials: true,
+        methods: '*',
+        origin: true,
+    }),
+);
+
 
 const { PORT } = process.env
 // respond with "hello world" when a GET request is made to the homepage
@@ -18,20 +31,28 @@ app.get('/ingredients', async function (req, res) {
 
     const results: IIngredients[] = await db.consult("SELECT * FROM INGREDIENTS");
 
-    const ingredients = [...new Set(results.map(item => item.ingredient_name))].map((item => {
+    const keys = [...new Set(results.map(item => item.ingredient_name.toLocaleLowerCase()))]
+    const model = keys.map((item => {
         return {
-            [item.toLocaleLowerCase()]:
+            [item]:
                 results
-                    .filter(x => x.ingredient_name === item)
+                    .filter(x => x.ingredient_name.toLocaleLowerCase() === item)
                     .map((y) => {
                         return {
                             id: y.ingredient_id,
-                            type: y.ingredient_type
+                            type: y.ingredient_type,
                         }
-                    })
+                    }),
+            name: item
         }
     }
     ))
+
+    const ingredients: any = {}
+
+    keys.forEach((k) => {
+        ingredients[k] = (model.find(item => k === item.name) as any)[k];
+    })
 
     res.send(ingredients);
 });// GET method route
@@ -70,6 +91,136 @@ app.get('/status', async function (req, res) {
 
 
     res.send(status);
+});// GET method route
+app.patch('/burgers/:id', async function (req, res) {
+
+    try {
+
+        const { id } = req.params;
+        const { status } = req.body
+
+        if (!id) {
+            return res.status(400).send({ message: 'Parâmetros inválidos!' })
+        }
+        const db = new sqlite()
+
+        await db.connectDb()
+
+        const results = await db.insert(`
+        update 
+        "BURGERS" 
+      set 
+        status = ?
+      where 
+        id = ?
+    `, [status, id]);
+
+        if (results.changes) {
+            return res.send({ status: "success", message: "Pedido realizado com sucesso!" });
+        }
+        return res.status(400).send({ status: "failed", message: "Erro ao realizar o pedido" });
+
+    } catch (e) {
+        console.log(e)
+        return res.status(400).send({ message: 'Erro ao realizar o pedido' })
+
+    }
+});// GET method route
+app.delete('/burgers/:id', async function (req, res) {
+
+ 
+    try {
+
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).send({ message: 'Parâmetros inválidos!' })
+        }
+        const db = new sqlite()
+
+        await db.connectDb()
+
+        const results = await db.insert(`
+        delete from 
+          "BURGERS" 
+        where 
+          id = ?
+    `, [id]);
+
+        if (results.changes) {
+            return res.send({ status: "success", message: "Pedido realizado com sucesso!" });
+        }
+        return res.status(400).send({ status: "failed", message: "Erro ao realizar o pedido" });
+
+    } catch (e) {
+        console.log(e)
+        return res.status(400).send({ message: 'Erro ao realizar o pedido' })
+
+    }
+});// GET method route
+app.post('/burger', async function (req, res) {
+
+    try {
+
+
+        const { name, meat, bread, opcionais, status } = req.body;
+
+        if (!name || !meat || !bread || !opcionais || !status) {
+            return res.status(400).send({ message: 'Não há nada caralho!' })
+        }
+        const db = new sqlite()
+
+        await db.connectDb()
+
+        const results = await db.insert(`
+    insert into 
+  "BURGERS" (
+    client_name, 
+    meat, 
+    bread, 
+    status
+  )
+values
+  (
+    ?, 
+    ?, 
+    ?, 
+    ?
+  )
+    `, [name, meat, bread, status]);
+
+        if (results.changes) {
+            results.lastID
+
+            const promises = opcionais.map((item: string) =>
+                db.insert(`
+            insert into 
+            "OPTIONAL_INGREDIENTS" (
+              ingredient, 
+              order_id
+            )
+          values
+            (
+              ?, 
+             ?
+            );
+            `, [item, results.lastID])
+            )
+
+            const responses = await Promise.allSettled(promises)
+            const success = responses.every(item => item.status === 'fulfilled')
+            if (success) {
+                return res.send({ status: "success", message: "Pedido realizado com sucesso!" });
+            }
+            return res.status(400).send({ status: "failed", message: "Erro ao realizar o pedido" });
+
+
+        }
+    } catch (e) {
+        console.log(e)
+        return res.status(400).send({ message: 'Erro ao realizar o pedido' })
+
+    }
 });// GET method route
 
 
